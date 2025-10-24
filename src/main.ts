@@ -566,17 +566,24 @@ async function main() {
     }
   });
   window.addEventListener("keyup", (e) => {
-    if (e.code === jumpKey) {
-      jumpKeyDown = false;
-    } else if (e.code === attackKey) {
-      attackKeyDown = false;
-    } else if (e.code === dashKey) {
-      dashKeyDown = false;
-    } else if (e.code === shiftKey) {
-      isSneaking = false;
-    } else if (e.code == "KeyI") {
-      saveScore(false);
-    } else if (!gameRunning) restart();
+    if (gameRunning) {
+      if (e.code === jumpKey) {
+        jumpKeyDown = false;
+      }
+      if (e.code === attackKey) {
+        attackKeyDown = false;
+      }
+      if (e.code === dashKey) {
+        dashKeyDown = false;
+      }
+      if (e.code === shiftKey) {
+        isSneaking = false;
+      }
+    } else {
+      if (e.code == "KeyI") {
+        saveScore(false);
+      } else restart();
+    }
   });
 
   async function keyMatcher() {
