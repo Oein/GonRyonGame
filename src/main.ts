@@ -28,6 +28,8 @@ import createButton from "./buttonts";
 async function main() {
   const container = document.getElementById("container");
   if (!container) return;
+  let scoreSaved = false;
+  let startTime = Date.now();
 
   // const playerTextureDefault = new Two.Texture("./assets/player/000.png");
   const playerTextures = [
@@ -128,12 +130,23 @@ async function main() {
     console.log("Dash triggered");
     if (PLAYER_DASH_T == 0) PLAYER_DASH_T = PLAYER_DASH_TIME_FULL;
   }
+  let gameTime = 0;
   function gameOver() {
     overlay.visible = true;
     gameRunning = false;
+    gameTime = Date.now() - startTime;
 
     yVelocity = 0;
     playerY = 0;
+
+    if (
+      playerName != null &&
+      lastFetchedLSCR != null &&
+      lastFetchedLSCR < frameCount
+    ) {
+      notifier.show("자동저장 시도중...");
+      saveScore(true);
+    }
   }
   function onSneakStart() {
     if (playerY > 0) {
@@ -386,6 +399,7 @@ async function main() {
   }
 
   function restart() {
+    scoreSaved = false;
     obstacles.forEach((x) => x.destroy(true));
     obstacles = [];
 
@@ -415,6 +429,30 @@ async function main() {
   let jumpKeyDown = false;
   let attackKeyDown = false;
   let dashKeyDown = false;
+
+  // 리더보드 드로어 초기화 및 제어
+  function initializeLeaderboard() {
+    const drawer = document.getElementById("leaderboard-drawer") as HTMLElement;
+    const toggleButton = document.getElementById(
+      "drawer-toggle"
+    ) as HTMLElement;
+
+    // 토글 버튼 클릭 이벤트
+    toggleButton.addEventListener("click", () => {
+      if (gameRunning) return drawer.classList.remove("open");
+      drawer.classList.toggle("open");
+    });
+
+    // ESC 키로 드로어 닫기
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && drawer.classList.contains("open")) {
+        drawer.classList.remove("open");
+      }
+    });
+
+    const title = document.getElementById("lbd-title") as HTMLElement;
+    if (title) title.textContent = "리더보드";
+  }
 
   two.bind("update", () => {
     if (Date.now() - LAST_UPDATE_TIME < INTV) return;
@@ -525,23 +563,20 @@ async function main() {
       if (e.code === shiftKey) {
         isSneaking = true;
       }
-    } else {
-      restart();
     }
   });
   window.addEventListener("keyup", (e) => {
     if (e.code === jumpKey) {
       jumpKeyDown = false;
-    }
-    if (e.code === attackKey) {
+    } else if (e.code === attackKey) {
       attackKeyDown = false;
-    }
-    if (e.code === dashKey) {
+    } else if (e.code === dashKey) {
       dashKeyDown = false;
-    }
-    if (e.code === shiftKey) {
+    } else if (e.code === shiftKey) {
       isSneaking = false;
-    }
+    } else if (e.code == "KeyI") {
+      saveScore(false);
+    } else if (!gameRunning) restart();
   });
 
   async function keyMatcher() {
@@ -586,6 +621,9 @@ async function main() {
     window.removeEventListener("keyup", listener);
   }
 
+  let playerName: string | null = null;
+  let lastFetchedLSCR: number | null = null;
+
   createButton({
     text: "키 변경",
     onClick: (e: Event) => {
@@ -595,6 +633,242 @@ async function main() {
       e.currentTarget && (e.currentTarget as HTMLElement).blur();
     },
     bgColor: "#44aa44",
+    fgColor: "white",
+  });
+
+  function showLeaderboard(scores: [string, number, number][]) {
+    const list = document.getElementById("leaderboard-list") as HTMLElement;
+    list.innerHTML = ""; // 기존 내용 지우기
+
+    console.log("Showing leaderboard:", scores);
+    if (scores.length === 0) {
+      const noDataItem = document.createElement("div");
+      noDataItem.innerText = "저장된 점수가 없습니다.";
+      noDataItem.style.textAlign = "center";
+      list.appendChild(noDataItem);
+      return;
+    }
+
+    lastFetchedLSCR = scores.length > 0 ? scores[scores.length - 1][2] : 0;
+
+    scores.forEach(([name, time, score], index) => {
+      const listItem = document.createElement("div");
+      const idnx = document.createElement("div");
+      const nm = document.createElement("div");
+      const scr = document.createElement("div");
+      listItem.style.display = "flex";
+      listItem.style.padding = "8px 0px";
+      listItem.style.borderBottom = "1px solid #eee";
+      if (index == scores.length - 1) {
+        listItem.style.borderBottom = "none";
+      }
+      idnx.style.width = "2rem";
+      idnx.style.marginRight = "10px";
+      idnx.style.textAlign = "right";
+      nm.style.flex = "1";
+      scr.style.textAlign = "right";
+      scr.style.display = "flex";
+      scr.style.justifyContent = "flex-end";
+      scr.style.alignItems = "flex-end";
+      listItem.appendChild(idnx);
+      listItem.appendChild(nm);
+      listItem.appendChild(scr);
+      idnx.innerText = `${index + 1}.`;
+      nm.innerText = name;
+
+      const scrSpan = document.createElement("span");
+      const scrSpan2 = document.createElement("span");
+      scrSpan.innerText = `${Math.floor(score)}점`;
+      scrSpan2.style.color = "#888888a0";
+      scrSpan2.style.fontSize = "0.8em";
+      scrSpan2.style.fontWeight = "normal";
+      scrSpan2.style.marginLeft = "4px";
+      scrSpan2.innerText = `(${(time / 1000).toFixed(2)}s)`;
+      scr.appendChild(scrSpan);
+      scr.appendChild(scrSpan2);
+
+      list.appendChild(listItem);
+
+      if (index <= 2) {
+        idnx.style.fontWeight = "bold";
+        nm.style.fontWeight = "bold";
+        scr.style.fontWeight = "bold";
+      }
+
+      if (index === 0) {
+        idnx.innerText = "🥇";
+        nm.style.color = "#ffb400";
+        scr.style.color = "#ffb400";
+      } else if (index === 1) {
+        idnx.innerText = "🥈";
+        nm.style.color = "#c0c0c0";
+        scr.style.color = "#c0c0c0";
+      } else if (index === 2) {
+        idnx.innerText = "🥉";
+        nm.style.color = "#cd7f32";
+        scr.style.color = "#cd7f32";
+      }
+    });
+  }
+
+  class OnKV {
+    skv = "e7qbddvl";
+    get__(key: string) {
+      return fetch(
+        `https://keyvalue.immanuel.co/api/KeyVal/GetValue/${this.skv}/${key}`
+      )
+        .then((res) => res.text())
+        .then((res) => JSON.parse(res));
+    }
+    set__(key: string, value: any) {
+      return fetch(
+        `https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${this.skv}/${key}/${value}`,
+        {
+          method: "POST",
+        }
+      );
+    }
+    async get(
+      key: string,
+      progressSender?: (now: number, total: number) => void
+    ) {
+      // it has 60 chars limit
+      // so it should be saved as parts
+      const parts = await this.get__(key + "_l").then((res) => {
+        const length = parseInt(res, 10);
+        const parts = [];
+        for (let i = 0; i < length; i++) {
+          parts.push(
+            new Promise<any>((resolve) => {
+              this.get__(key + "_" + i).then((res) => {
+                resolve(res);
+                if (progressSender) progressSender(i + 1, length);
+              });
+            })
+          );
+        }
+        console.log(res, length, parts);
+        return Promise.all(parts);
+      });
+      console.log(parts.join(""), parts);
+      return JSON.parse(decodeURIComponent(atob(parts.join(""))));
+    }
+    async set(
+      key: string,
+      value: any,
+      progressSender?: (now: number, total: number) => void
+    ) {
+      const toSave = btoa(encodeURIComponent(JSON.stringify(value)));
+      const parts = [];
+      const SPILIT_BY = 50;
+      for (let i = 0; i < toSave.length; i += SPILIT_BY) {
+        parts.push(toSave.substring(i, i + SPILIT_BY));
+      }
+      console.log("Saving of", key, "in", parts.length, "parts");
+      await this.set__(key + "_l", parts.length);
+      let sent = 0;
+      await Promise.all(
+        parts.map((part, i) => {
+          this.set__(key + "_" + i, part);
+          sent++;
+          if (progressSender) progressSender(sent, parts.length);
+          console.log("Saved part of", key, i + 1, " / ", parts.length);
+        })
+      );
+    }
+  }
+  const kv = new OnKV();
+  (window as any).kv = kv;
+
+  async function fetchLeaderboard() {
+    notifier.show("리더보드 불러오는중...");
+    const lb: [string, number, number][] = await kv.get("l", (now, total) => {
+      notifier.show(`리더보드 불러오는중... ${now} / ${total}`, 500);
+    });
+    console.log("Fetched leaderboard:", lb);
+    showLeaderboard(lb);
+    lastFetchedLSCR = lb.length == 0 ? 0 : lb[lb.length - 1][2];
+    notifier.show("리더보드를 불러왔습니다!");
+  }
+
+  async function saveScore(autoSave = false) {
+    if (gameRunning)
+      return notifier.show("게임 중에는 점수를 저장할 수 없습니다.");
+    if (frameCount <= 0)
+      return notifier.show("점수가 0점 이하일 때는 저장할 수 없습니다.");
+    if (scoreSaved) return notifier.show("이미 점수를 저장했습니다.");
+    scoreSaved = true;
+    const score = frameCount;
+    const time = gameTime;
+    if (score <= 0) return;
+    const cf = autoSave || confirm(`점수 ${score}점을 저장하시겠습니까?`);
+    if (!cf) return;
+    const namePrompt = () => {
+      if (playerName != null) return playerName;
+      // allow only english in lowercase, numbers, _, -
+      const name = prompt(
+        "이름을 입력하세요 (영어 소문자, 숫자, _, - 만 가능, 최대 10자)"
+      );
+      if (!name) return null;
+      if (name.length > 10) {
+        alert("이름이 너무 깁니다. 최대 10자까지 가능합니다.");
+        return namePrompt();
+      }
+      if (!/^[a-z0-9_-]+$/.test(name)) {
+        alert("이름에 허용되지 않는 문자가 포함되어 있습니다.");
+        return namePrompt();
+      }
+      return name;
+    };
+    const name = namePrompt();
+    if (!name) return;
+    playerName = name;
+
+    console.log("Saving score:", score, time, name);
+    notifier.show("리더보드 가저오는중...");
+    let lb: [string, number, number][] = await kv.get("l", (now, total) => {
+      notifier.show(`리더보드 불러오는중... ${now} / ${total}`, 100);
+    });
+    if (lb.length < 10) {
+      lb.push([name, time, score]);
+      lb = lb.sort((a, b) => b[2] - a[2]);
+      notifier.show("리더보드 저장중...");
+      showLeaderboard(lb);
+      await kv.set("l", lb, (now, total) => {
+        notifier.show(`리더보드 저장중... ${now} / ${total}`, 500);
+      });
+      notifier.show("점수가 저장되었습니다!");
+      return;
+    }
+    lastFetchedLSCR = lb.length == 0 ? 0 : lb[lb.length - 1][2];
+    if (lb[lb.length - 1][2] >= score) {
+      notifier.show("점수가 리더보드에 들지 못했습니다.");
+      return;
+    }
+    lb.push([name, time, score]);
+    lb = lb.sort((a, b) => b[2] - a[2]);
+    while (lb.length > 10) lb.pop();
+    console.log("New leaderboard:", lb);
+    notifier.show("리더보드 저장중...");
+    await kv.set("l", lb, (now, total) => {
+      notifier.show(`리더보드 저장중... ${now} / ${total}`, 500);
+    });
+    notifier.show("점수가 저장되었습니다!");
+    showLeaderboard(lb);
+  }
+
+  initializeLeaderboard();
+  fetchLeaderboard();
+
+  createButton({
+    text: "점수 저장",
+    onClick: (e: Event) => {
+      saveScore();
+      e.stopPropagation();
+      e.preventDefault();
+      e.currentTarget && (e.currentTarget as HTMLElement).blur();
+    },
+    bgColor: "#4488ff",
     fgColor: "white",
   });
 }
