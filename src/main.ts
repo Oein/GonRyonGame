@@ -139,6 +139,14 @@ async function main() {
     yVelocity = 0;
     playerY = 0;
 
+    isSneaking = false;
+    dashKeyDown = false;
+    attackKeyDown = false;
+    jumpKeyDown = false;
+
+    PLAYER_DASH_T = 0;
+    PLAYER_ATK_T = 0;
+
     if (
       playerName != null &&
       lastFetchedLSCR != null &&
