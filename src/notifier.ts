@@ -1,4 +1,4 @@
-class NotificationManager {
+export class NotificationManager {
   container: HTMLElement;
   constructor() {
     this.container = document.createElement("div");
@@ -9,8 +9,12 @@ class NotificationManager {
     document.body.appendChild(this.container);
   }
 
+  containers: { [key: string]: [HTMLElement, number] } = {};
+
   show(message: string, duration = 2000) {
+    const notificationId = `notification-${Date.now()}`;
     const notification = document.createElement("div");
+    notification.id = notificationId;
     notification.innerText = message;
     notification.style.background = "rgba(0, 0, 0, 0.7)";
     notification.style.color = "white";
@@ -36,13 +40,51 @@ class NotificationManager {
     }, 10);
 
     // Fade out and remove after duration
-    setTimeout(() => {
+    let timeout = setTimeout(() => {
       notification.style.opacity = "0";
       notification.style.transform = "translateX(10px)";
       notification.addEventListener("transitionend", () => {
         notification.remove();
       });
     }, duration);
+
+    this.containers[notificationId] = [notification, timeout];
+
+    return notificationId;
+  }
+
+  dismiss(notificationId: string) {
+    const entry = this.containers[notificationId];
+    if (entry) {
+      const [notification, timeout] = entry;
+      clearTimeout(timeout);
+      notification.style.opacity = "0";
+      notification.style.transform = "translateX(10px)";
+      notification.addEventListener("transitionend", () => {
+        notification.remove();
+      });
+      delete this.containers[notificationId];
+    }
+  }
+
+  update(notificationId: string, newMessage: string, duration = 2000) {
+    const entry = this.containers[notificationId];
+    if (entry) {
+      const [notification, timeout] = entry;
+      clearTimeout(timeout);
+      notification.innerText = newMessage;
+
+      // Set new timeout
+      let newTimeout = setTimeout(() => {
+        notification.style.opacity = "0";
+        notification.style.transform = "translateX(10px)";
+        notification.addEventListener("transitionend", () => {
+          notification.remove();
+        });
+      }, duration);
+
+      this.containers[notificationId] = [notification, newTimeout];
+    }
   }
 }
 
